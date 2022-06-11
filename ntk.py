@@ -106,14 +106,9 @@ def compute_gradients(in_queue, out_queue, model, params_slice, loader, out):
     pbar.close()
 
 
-def _init_compute_XXt(chunk_id, buffer_size, buffer_dtype):
-    local.buffer = torch.zeros(buffer_size, dtype=buffer_dtype, device="cuda")
-    local.chunk_id = chunk_id
-
-
-def _compute_XXt(chunk, chunk_id, buffer_size, buffer_dtype, train_slice, test_slice):
-    if not "chunk_id" in local.__dict__ or local.chunk_id[:2] != chunk_id[:2]:
-        _init_compute_XXt(chunk_id, buffer_size, buffer_dtype)
+def _compute_XXt(chunk, buffer_size, buffer_dtype, train_slice, test_slice):
+    if not "buffer" in local.__dict__:
+        local.buffer = torch.zeros(buffer_size, dtype=buffer_dtype, device="cuda")
 
     chunk = chunk.to(local.buffer)
     local.buffer.addmm_(chunk[test_slice], chunk[train_slice].T)
@@ -130,26 +125,26 @@ def _clear_XXt_buffer():
     torch.cuda.empty_cache()
 
 
-def compute_XXt(in_queues, out_queue, epoch, X, out, row_chunksize, col_chunksize):
+def compute_XXt(
+    in_queue_XXt, in_queues_devices, out_queue, X, out, row_chunksize, col_chunksize
+):
     in_flight = 0
     train_slice = slice(0, out.size()[1])
-    for i in tqdm(range(0, X.size()[0], row_chunksize)):
+    for i in range(0, X.size()[0], row_chunksize):
         test_slice = slice(i, i + row_chunksize)
-        for j in range(0, X.size()[1], col_chunksize):
+        for j in tqdm(range(0, X.size()[1], col_chunksize)):
             chunk = X[:, j : j + col_chunksize].clone()
             args = (
                 chunk,
-                (epoch, i, j),
                 out[test_slice].shape,
                 out.dtype,
                 train_slice,
                 test_slice,
             )
-            d = (j // col_chunksize) % len(in_queues)
-            in_queues[d].put((_compute_XXt, args))
+            in_queue_XXt.put((_compute_XXt, args))
             in_flight += 1
 
-            if in_flight >= 3 * len(in_queues):
+            if in_flight >= 3 * len(in_queues_devices):
                 _ = out_queue.get()
                 in_flight -= 1
 
@@ -157,7 +152,7 @@ def compute_XXt(in_queues, out_queue, epoch, X, out, row_chunksize, col_chunksiz
             _ = out_queue.get()
             in_flight -= 1
 
-        for in_queue in in_queues:
+        for in_queue in in_queues_devices:
             in_queue.put((_return_XXt_buffer, ()))
             in_flight += 1
 
@@ -168,12 +163,12 @@ def compute_XXt(in_queues, out_queue, epoch, X, out, row_chunksize, col_chunksiz
             del gpu_buffer
             in_flight -= 1
 
-        for in_queue in in_queues:
+        for in_queue in in_queues_devices:
             in_queue.put((_clear_XXt_buffer, ()))
             in_flight += 1
 
         while in_flight > 0:
-            gpu_buffer = out_queue.get()
+            _ = out_queue.get()
             in_flight -= 1
 
 
@@ -207,12 +202,14 @@ def compute_ntk(
 
     num_workers = num_devices * workers_per_device
     in_queue_grad = Queue()
+    in_queue_XXt = Queue()
     in_queues_devices = [Queue() for _ in range(num_devices)]
     out_queue = Queue()
     for i in range(num_workers):
         device = i % num_devices
         i_in_queues = [in_queue_grad]
         if i < num_devices:
+            i_in_queues.append(in_queue_XXt)
             i_in_queues.append(in_queues_devices[i])
         args = (device, init_torch_kwargs, i_in_queues, out_queue)
         Process(target=multiqueue_worker, args=args).start()
@@ -255,9 +252,9 @@ def compute_ntk(
 
         ntk_begin = time.time()
         compute_XXt(
+            in_queue_XXt,
             in_queues_devices,
             out_queue,
-            i,
             grads,
             ntk,
             mm_row_chunksize,
@@ -316,6 +313,7 @@ if __name__ == "__main__":
     parser.add_argument("--workers-per-device", type=int, default=1)
     parser.add_argument("--grad-chunksize", type=int)
     parser.add_argument("--mm-col-chunksize", type=int)
+    parser.add_argument("--ntk-dtype", type=str, default="float32")
     parser.add_argument("--loader-batch-size", type=int)
     parser.add_argument("--loader-num-workers", type=int)
     parser.add_argument("--no-pinned-memory", dest="pin_memory", action="store_false")
@@ -364,6 +362,7 @@ if __name__ == "__main__":
         "loader_kwargs": loader_kwargs,
         "pin_memory": args.pin_memory,
         "init_torch_kwargs": init_torch_kwargs,
+        "ntk_dtype": torch.float32 if args.ntk_dtype == "float32" else torch.float64,
     }
     ntk = compute_ntk(model, train_set, test_set, **kwargs)
 
