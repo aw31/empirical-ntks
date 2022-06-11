@@ -10,15 +10,9 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 
-from FGVCAircraft import FGVCAircraft
-from Food101 import Food101
-from Flowers102 import Flowers102
-
-# def print_gpu_stats():
-#     t = torch.cuda.get_device_properties(0).total_memory / 1024 ** 3
-#     r = torch.cuda.memory_reserved(0) / 1024 ** 3
-#     a = torch.cuda.memory_allocated(0) / 1024 ** 3
-#     print(f'{t:.2f} GiB total capacity; {a:.2f} GiB already allocated; {r:.2f} GiB reserved in total by PyTorch')
+from datasets.FGVCAircraft import FGVCAircraft
+from datasets.Food101 import Food101
+from datasets.Flowers102 import Flowers102
 
 # From https://stackoverflow.com/a/1094933
 def humanize_units(size, unit="B"):
@@ -48,21 +42,29 @@ def init_torch(allow_tf32=False, benchmark=False, deterministic=True, verbose=Fa
 
 
 def init_logging(handle, logdir):
-    logdir = pathlib.Path(logdir)
-    logdir.mkdir(parents=True, exist_ok=True)
+    if logdir is not None:
+        logdir = pathlib.Path(logdir)
+        logdir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = int(time.time())
-    filename = logdir / f"{handle}-{timestamp}.log"
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=[
-            logging.FileHandler(filename=filename),
-            logging.StreamHandler(sys.stdout),
-        ],
-    )
-    logging.info(f"Logging to {filename}")
+        timestamp = int(time.time())
+        filename = logdir / f"{handle}-{timestamp}.log"
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s [%(levelname)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+            handlers=[
+                logging.FileHandler(filename=filename),
+                logging.StreamHandler(sys.stdout),
+            ],
+        )
+        logging.info(f"Logging to {filename}")
+    else:
+        logging.basicConfig(
+            format="%(asctime)s [%(levelname)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+            level=logging.DEBUG,
+            stream=sys.stdout,
+        )
 
 
 def load_model(name):

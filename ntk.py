@@ -247,7 +247,7 @@ def compute_ntk(
         grads_begin = time.time()
         compute_gradients(in_queue_grad, out_queue, model, params_slice, loader, grads)
         grads_end = time.time()
-        logging.info(f"Computed grads in {int(grads_end - grads_begin)}s")
+        logging.info(f"Computed partial Jacobian in {int(grads_end - grads_begin)}s")
         torch.cuda.empty_cache()
 
         ntk_begin = time.time()
@@ -261,7 +261,7 @@ def compute_ntk(
             mm_col_chunksize,
         )
         ntk_end = time.time()
-        logging.info(f"Computed NTK in {int(ntk_end - ntk_begin)}s")
+        logging.info(f"Computed partial NTK in {int(ntk_end - ntk_begin)}s")
         torch.cuda.empty_cache()
 
     for i in range(num_workers):
@@ -297,6 +297,7 @@ def load_ntk(savedir, handle, map_location=None):
 if __name__ == "__main__":
     import argparse
     import pprint
+    import sys
     from torch.multiprocessing import set_start_method, set_sharing_strategy
     from utils import init_logging, load_model, load_dataset
 
@@ -324,8 +325,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    if args.logdir:
-        init_logging("ntk", args.logdir)
+    init_logging("ntk", args.logdir)
     logging.info(f"args =\n{pprint.pformat(vars(args))}")
 
     # Initialize torch
