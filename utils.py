@@ -29,6 +29,24 @@ def humanize_units(size, unit="B"):
     return f"{size:.1f}{prefix}"
 
 
+def init_torch(allow_tf32=False, benchmark=False, deterministic=True, verbose=False):
+    # Disable tf32 in favor of more accurate gradients
+    torch.backends.cuda.matmul.allow_tf32 = allow_tf32
+    torch.backends.cudnn.allow_tf32 = allow_tf32
+
+    # Benchmarking can lead to non-determinism
+    torch.backends.cudnn.benchmark = benchmark
+
+    # Ensure repeated gradient calculations are consistent
+    torch.backends.cudnn.deterministic = deterministic
+
+    if verbose:
+        logging.info(f"{torch.backends.cuda.matmul.allow_tf32 = }")
+        logging.info(f"{torch.backends.cudnn.allow_tf32 = }")
+        logging.info(f"{torch.backends.cudnn.benchmark = }")
+        logging.info(f"{torch.backends.cudnn.deterministic = }")
+
+
 def init_logging(handle, logdir):
     logdir = pathlib.Path(logdir)
     logdir.mkdir(parents=True, exist_ok=True)
@@ -110,7 +128,6 @@ def load_FakeData():
     return dataset
 
 
-# TODO: What is the right normalization to do for finetuning?
 def load_CIFAR10(datadir, split):
     root = str(datadir / "CIFAR-10")
     train = split == "train"
