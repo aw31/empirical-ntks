@@ -14,7 +14,7 @@ The following command computes the empirical NTK for all of CIFAR-10. The output
 python3 ~/empirical-ntks/ntk.py CIFAR-10 resnet-18_pretrained --workers-per-device 4 --grad-chunksize 1900000 --mm-col-chunksize 20000 --loader-batch-size 50 --loader-num-workers 12
 ```
 
-To work with other datasets or model, see `utils.py` for further options.
+To work with other datasets or models, see `utils.py` for further options.
 
 
 ## Implementation
@@ -25,7 +25,7 @@ By optimizing data transfer, increasing GPU utilization, and parallelizing with 
 
 ## Performance
 
-Computes an empirical NTK (60,000 x 50,000) for a ResNet-18 over CIFAR-10 at `float32` precision in 43 minutes on a machine with 4 A100 GPUs and 755GB RAM.
+Our library computes an empirical NTK (60,000 x 50,000) for a ResNet-18 over CIFAR-10 at `float32` precision in 43 minutes on a machine with 4 A100 GPUs and 755GB RAM.
 
 ## Citation
 
