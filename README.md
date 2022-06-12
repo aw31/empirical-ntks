@@ -25,7 +25,7 @@ By optimizing data transfer, increasing GPU utilization, and parallelizing with 
 
 ## Performance
 
-Our library computes an empirical NTK (60,000 x 50,000) for a ResNet-18 over CIFAR-10 at `float32` precision in 43 minutes on a machine with 4 A100 GPUs and 755GB RAM.
+Our library computes an empirical NTK (60,000 x 50,000) for a ResNet-18 over CIFAR-10 at `float32` precision in 43 minutes (1e-6 seconds per NTK entry) on a machine with 4 A100 GPUs and 755GB RAM.
 
 ## Citation
 
